@@ -1,0 +1,503 @@
+{
+  "info": {
+    "name": "Multi-Tenant CRM API (MySQL)",
+    "description": "API collection for Multi-Tenant SaaS CRM system with MySQL database",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin APIs",
+      "item": [
+        {
+          "name": "Create Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ACME Corporation\",\n  \"slug\": \"acme\",\n  \"db_name\": \"tenant_acme\",\n  \"db_user\": \"acme_user\",\n  \"db_pass\": \"acme_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/tenants",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants"]
+            }
+          }
+        },
+        {
+          "name": "List Tenants",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/tenants",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants"]
+            }
+          }
+        },
+        {
+          "name": "Get Tenant",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/tenants/{{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants", "{{tenant_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Tenant",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ACME Corporation Updated\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/tenants/{{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants", "{{tenant_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Suspend Tenant",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/admin/tenants/{{tenant_id}}/suspend",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants", "{{tenant_id}}", "suspend"]
+            }
+          }
+        },
+        {
+          "name": "Activate Tenant",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/admin/tenants/{{tenant_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants", "{{tenant_id}}", "activate"]
+            }
+          }
+        },
+        {
+          "name": "Delete Tenant",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/admin/tenants/{{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tenants", "{{tenant_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenant Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', response.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": {{tenant_id}},\n  \"email\": \"admin@tenant.com\",\n  \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tenant/login",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/me",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "me"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/logout",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "List Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "contacts"]
+            }
+          }
+        },
+        {
+          "name": "Create Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"company\": \"Example Corp\",\n  \"notes\": \"Potential customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tenant/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "contacts"]
+            }
+          }
+        },
+        {
+          "name": "Get Contact",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/contacts/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "contacts", "1"]
+            }
+          }
+        },
+        {
+          "name": "Update Contact",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"email\": \"john.updated@example.com\",\n  \"phone\": \"+1234567890\",\n  \"company\": \"Example Corp Updated\",\n  \"notes\": \"Updated notes\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tenant/contacts/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "contacts", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Contact",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/contacts/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "contacts", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deals",
+      "item": [
+        {
+          "name": "List Deals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/deals",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals"]
+            }
+          }
+        },
+        {
+          "name": "Create Deal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Website Development\",\n  \"amount\": 5000.00,\n  \"contact_id\": 1,\n  \"assigned_to\": 1,\n  \"description\": \"Custom website development project\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tenant/deals",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals"]
+            }
+          }
+        },
+        {
+          "name": "Get Deal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/deals/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals", "1"]
+            }
+          }
+        },
+        {
+          "name": "Update Deal",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Website Development Updated\",\n  \"amount\": 6000.00,\n  \"description\": \"Updated project description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tenant/deals/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals", "1"]
+            }
+          }
+        },
+        {
+          "name": "Mark Deal as Won",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/deals/1/won",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals", "1", "won"]
+            }
+          }
+        },
+        {
+          "name": "Mark Deal as Lost",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/deals/1/lost",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals", "1", "lost"]
+            }
+          }
+        },
+        {
+          "name": "Delete Deal",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/deals/1",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "deals", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Deals Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/reports/deals",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "reports", "deals"]
+            }
+          }
+        },
+        {
+          "name": "Contacts Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/reports/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "reports", "contacts"]
+            }
+          }
+        },
+        {
+          "name": "Activities Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tenant/reports/activities",
+              "host": ["{{base_url}}"],
+              "path": ["tenant", "reports", "activities"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
