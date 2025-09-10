@@ -8,7 +8,11 @@ use App\Http\Resources\Tenant\UserResource;
 use App\Services\JwtService;
 use App\Services\TenantManager;
 use App\Models\Tenant\User;
+use App\Exceptions\Custom\TenantNotFoundException;
+use App\Exceptions\Custom\TenantSuspendedException;
+use App\Exceptions\Custom\DatabaseConnectionException;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
@@ -26,9 +30,9 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request)
     {
+        $tenantId = (int) $request->input('tenant_id');
+        
         try {
-            $tenantId = (int) $request->input('tenant_id');
-            
             // Switch to tenant database
             $this->tenantManager->switch($tenantId);
 
@@ -37,7 +41,11 @@ class AuthController extends Controller
 
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
-                    'message' => 'Invalid credentials'
+                    'success' => false,
+                    'message' => 'Invalid credentials',
+                    'error' => 'INVALID_CREDENTIALS',
+                    'status_code' => 401,
+                    'timestamp' => now()->toISOString(),
                 ], 401);
             }
 
@@ -50,14 +58,23 @@ class AuthController extends Controller
             ]);
 
             return response()->json([
+                'success' => true,
                 'access_token' => $token,
                 'token_type' => 'bearer',
                 'expires_in' => 4 * 60 * 60, // 4 hours in seconds
-                'user' => new UserResource($user)
+                'user' => new UserResource($user),
+                'timestamp' => now()->toISOString(),
             ]);
+        } catch (TenantNotFoundException | TenantSuspendedException | DatabaseConnectionException $e) {
+            throw $e; // Re-throw custom exceptions
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Authentication failed'
+                'success' => false,
+                'message' => 'Authentication failed',
+                'error' => 'AUTHENTICATION_FAILED',
+                'status_code' => 401,
+                'details' => app()->environment('local') ? $e->getMessage() : null,
+                'timestamp' => now()->toISOString(),
             ], 401);
         }
     }

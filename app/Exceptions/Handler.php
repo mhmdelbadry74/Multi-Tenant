@@ -10,6 +10,15 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use App\Exceptions\Custom\JwtException;
+use App\Exceptions\Custom\TenantException;
+use App\Exceptions\Custom\TenantNotFoundException;
+use App\Exceptions\Custom\TenantSuspendedException;
+use App\Exceptions\Custom\DatabaseConnectionException;
+use App\Exceptions\Custom\FileUploadException;
+use App\Exceptions\Custom\ProvisioningException;
+use App\Http\Resources\ErrorResource;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -31,7 +40,15 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
-            //
+            // Log all exceptions except validation and authentication
+            if (!($e instanceof ValidationException) && !($e instanceof AuthenticationException)) {
+                Log::error('Exception occurred', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
         });
     }
 
@@ -53,6 +70,35 @@ class Handler extends ExceptionHandler
      */
     protected function handleApiException($request, Throwable $e)
     {
+        // Custom exceptions first
+        if ($e instanceof JwtException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof TenantException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof TenantNotFoundException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof TenantSuspendedException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof DatabaseConnectionException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof FileUploadException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
+        if ($e instanceof ProvisioningException) {
+            return new ErrorResource($e->getMessage(), $e->getStatusCode(), $e->getErrorCode());
+        }
+
         // Database connection errors
         if ($e instanceof QueryException) {
             return $this->handleDatabaseException($e);
@@ -65,49 +111,36 @@ class Handler extends ExceptionHandler
 
         // Authentication errors
         if ($e instanceof AuthenticationException) {
-            return response()->json([
-                'message' => 'Unauthenticated',
-                'error' => 'Authentication required'
-            ], 401);
+            return new ErrorResource('Unauthenticated', 401, 'AUTHENTICATION_REQUIRED');
         }
 
         // Throttle errors
         if ($e instanceof ThrottleRequestsException) {
-            return response()->json([
-                'message' => 'Too many requests',
-                'error' => 'Rate limit exceeded'
-            ], 429);
+            return new ErrorResource('Too many requests', 429, 'RATE_LIMIT_EXCEEDED');
         }
 
         // Not found errors
         if ($e instanceof NotFoundHttpException) {
-            return response()->json([
-                'message' => 'Resource not found',
-                'error' => 'The requested resource could not be found'
-            ], 404);
+            return new ErrorResource('Resource not found', 404, 'RESOURCE_NOT_FOUND');
         }
 
         // Method not allowed errors
         if ($e instanceof MethodNotAllowedHttpException) {
-            return response()->json([
-                'message' => 'Method not allowed',
-                'error' => 'The HTTP method is not allowed for this endpoint'
-            ], 405);
+            return new ErrorResource('Method not allowed', 405, 'METHOD_NOT_ALLOWED');
         }
 
         // Access denied errors
         if ($e instanceof AccessDeniedHttpException) {
-            return response()->json([
-                'message' => 'Access denied',
-                'error' => 'You do not have permission to access this resource'
-            ], 403);
+            return new ErrorResource('Access denied', 403, 'ACCESS_DENIED');
         }
 
         // Generic server error
-        return response()->json([
-            'message' => 'Internal server error',
-            'error' => app()->environment('local') ? $e->getMessage() : 'Something went wrong'
-        ], 500);
+        return new ErrorResource(
+            'Internal server error', 
+            500, 
+            'INTERNAL_SERVER_ERROR',
+            app()->environment('local') ? $e->getMessage() : null
+        );
     }
 
     /**
@@ -121,53 +154,60 @@ class Handler extends ExceptionHandler
         // MySQL specific error codes
         switch ($errorCode) {
             case 1045: // Access denied
-                return response()->json([
-                    'message' => 'Database connection failed',
-                    'error' => 'Invalid database credentials',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 500);
+                return new ErrorResource(
+                    'Database connection failed',
+                    500,
+                    'DATABASE_ACCESS_DENIED',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             case 1049: // Unknown database
-                return response()->json([
-                    'message' => 'Database not found',
-                    'error' => 'The specified database does not exist',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 500);
+                return new ErrorResource(
+                    'Database not found',
+                    500,
+                    'DATABASE_NOT_FOUND',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             case 2002: // Connection refused
-                return response()->json([
-                    'message' => 'Database connection failed',
-                    'error' => 'Unable to connect to database server',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 500);
+                return new ErrorResource(
+                    'Database connection failed',
+                    500,
+                    'DATABASE_CONNECTION_REFUSED',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             case 1062: // Duplicate entry
-                return response()->json([
-                    'message' => 'Duplicate entry',
-                    'error' => 'A record with this information already exists',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 422);
+                return new ErrorResource(
+                    'Duplicate entry',
+                    422,
+                    'DUPLICATE_ENTRY',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             case 1452: // Foreign key constraint
-                return response()->json([
-                    'message' => 'Invalid reference',
-                    'error' => 'Referenced record does not exist',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 422);
+                return new ErrorResource(
+                    'Invalid reference',
+                    422,
+                    'FOREIGN_KEY_CONSTRAINT',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             case 1146: // Table doesn't exist
-                return response()->json([
-                    'message' => 'Database table not found',
-                    'error' => 'Required database table is missing',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 500);
+                return new ErrorResource(
+                    'Database table not found',
+                    500,
+                    'TABLE_NOT_FOUND',
+                    app()->environment('local') ? $errorMessage : null
+                );
 
             default:
-                return response()->json([
-                    'message' => 'Database error',
-                    'error' => 'An error occurred while processing your request',
-                    'details' => app()->environment('local') ? $errorMessage : null
-                ], 500);
+                return new ErrorResource(
+                    'Database error',
+                    500,
+                    'DATABASE_ERROR',
+                    app()->environment('local') ? $errorMessage : null
+                );
         }
     }
 
@@ -177,8 +217,12 @@ class Handler extends ExceptionHandler
     protected function handleValidationException(ValidationException $e)
     {
         return response()->json([
+            'success' => false,
             'message' => 'Validation failed',
-            'errors' => $e->errors()
+            'error' => 'VALIDATION_ERROR',
+            'status_code' => 422,
+            'errors' => $e->errors(),
+            'timestamp' => now()->toISOString(),
         ], 422);
     }
 }

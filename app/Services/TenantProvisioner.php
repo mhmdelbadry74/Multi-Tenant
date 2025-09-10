@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Artisan;
 use App\Models\System\Tenant;
 use App\Models\Tenant\User;
 use Illuminate\Support\Facades\Hash;
+use App\Exceptions\Custom\ProvisioningException;
+use App\Exceptions\Custom\DatabaseConnectionException;
 
 class TenantProvisioner
 {
@@ -42,9 +44,13 @@ class TenantProvisioner
             $this->runTenantSeeders();
 
             return true;
+        } catch (ProvisioningException $e) {
+            throw $e; // Re-throw provisioning exceptions
+        } catch (DatabaseConnectionException $e) {
+            throw new ProvisioningException("Database connection failed during provisioning: " . $e->getMessage());
         } catch (\Exception $e) {
             \Log::error("Failed to provision tenant {$tenant->id}: " . $e->getMessage());
-            return false;
+            throw new ProvisioningException("Failed to provision tenant: " . $e->getMessage());
         }
     }
 
@@ -53,11 +59,15 @@ class TenantProvisioner
      */
     protected function createDatabase(Tenant $tenant): void
     {
-        // Use system connection to create database
-        $connection = DB::connection('mysql');
-        
-        // Create MySQL database
-        $connection->statement("CREATE DATABASE IF NOT EXISTS `{$tenant->db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        try {
+            // Use system connection to create database
+            $connection = DB::connection('mysql');
+            
+            // Create MySQL database
+            $connection->statement("CREATE DATABASE IF NOT EXISTS `{$tenant->db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        } catch (\Exception $e) {
+            throw new ProvisioningException("Failed to create database for tenant: " . $e->getMessage());
+        }
     }
 
     /**
@@ -65,16 +75,20 @@ class TenantProvisioner
      */
     protected function createDatabaseUser(Tenant $tenant): void
     {
-        $connection = DB::connection('mysql');
-        
-        // Create user if it doesn't exist
-        $connection->statement("CREATE USER IF NOT EXISTS '{$tenant->db_user}'@'%' IDENTIFIED BY '{$tenant->db_pass}'");
-        
-        // Grant privileges on the tenant database
-        $connection->statement("GRANT ALL PRIVILEGES ON `{$tenant->db_name}`.* TO '{$tenant->db_user}'@'%'");
-        
-        // Flush privileges
-        $connection->statement("FLUSH PRIVILEGES");
+        try {
+            $connection = DB::connection('mysql');
+            
+            // Create user if it doesn't exist
+            $connection->statement("CREATE USER IF NOT EXISTS '{$tenant->db_user}'@'%' IDENTIFIED BY '{$tenant->db_pass}'");
+            
+            // Grant privileges on the tenant database
+            $connection->statement("GRANT ALL PRIVILEGES ON `{$tenant->db_name}`.* TO '{$tenant->db_user}'@'%'");
+            
+            // Flush privileges
+            $connection->statement("FLUSH PRIVILEGES");
+        } catch (\Exception $e) {
+            throw new ProvisioningException("Failed to create database user for tenant: " . $e->getMessage());
+        }
     }
 
     /**

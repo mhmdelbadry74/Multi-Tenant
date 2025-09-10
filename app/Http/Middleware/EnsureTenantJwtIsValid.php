@@ -8,6 +8,9 @@ use Symfony\Component\HttpFoundation\Response;
 use App\Services\JwtService;
 use App\Services\TenantManager;
 use App\Models\System\Tenant;
+use App\Exceptions\Custom\JwtException;
+use App\Exceptions\Custom\TenantNotFoundException;
+use App\Exceptions\Custom\TenantSuspendedException;
 
 class EnsureTenantJwtIsValid
 {
@@ -30,16 +33,13 @@ class EnsureTenantJwtIsValid
         $token = $request->bearerToken();
         
         if (!$token) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            throw new JwtException('No authentication token provided', 401, 'JWT_MISSING');
         }
 
         try {
             // Decode and validate JWT token
             $claims = $this->jwtService->decode($token);
-            
-            if (!$this->jwtService->validateClaims($claims)) {
-                return response()->json(['message' => 'Invalid token claims'], 401);
-            }
+            $this->jwtService->validateClaims($claims);
 
             $tenantId = $this->jwtService->getTenantId($claims);
             
@@ -47,11 +47,11 @@ class EnsureTenantJwtIsValid
             $tenant = Tenant::find($tenantId);
             
             if (!$tenant) {
-                return response()->json(['message' => 'Tenant not found'], 404);
+                throw new TenantNotFoundException("Tenant with ID {$tenantId} not found");
             }
 
             if (!$tenant->isActive()) {
-                return response()->json(['message' => 'Tenant is suspended'], 403);
+                throw new TenantSuspendedException("Tenant '{$tenant->name}' is suspended");
             }
 
             // Switch to tenant database
@@ -62,8 +62,10 @@ class EnsureTenantJwtIsValid
             $request->attributes->set('tenant', $tenant);
 
             return $next($request);
+        } catch (JwtException | TenantNotFoundException | TenantSuspendedException $e) {
+            throw $e; // Re-throw custom exceptions
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid token'], 401);
+            throw new JwtException('Invalid token: ' . $e->getMessage(), 401, 'JWT_INVALID');
         }
     }
 }

@@ -5,6 +5,9 @@ namespace App\Services;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\DB;
 use App\Models\System\Tenant;
+use App\Exceptions\Custom\TenantNotFoundException;
+use App\Exceptions\Custom\TenantSuspendedException;
+use App\Exceptions\Custom\DatabaseConnectionException;
 
 class TenantManager
 {
@@ -20,25 +23,38 @@ class TenantManager
      */
     public function switch(int $tenantId): Tenant
     {
-        $tenant = Tenant::findOrFail($tenantId);
+        $tenant = Tenant::find($tenantId);
+        
+        if (!$tenant) {
+            throw new TenantNotFoundException("Tenant with ID {$tenantId} not found");
+        }
         
         if ($tenant->status !== 'active') {
-            throw new \Exception('Tenant is suspended');
+            throw new TenantSuspendedException("Tenant '{$tenant->name}' is suspended");
         }
 
-        // Update tenant connection configuration for MySQL
-        $this->config->set([
-            'database.connections.tenant.driver' => 'mysql',
-            'database.connections.tenant.database' => $tenant->db_name,
-            'database.connections.tenant.username' => $tenant->db_user,
-            'database.connections.tenant.password' => $tenant->db_pass,
-        ]);
+        try {
+            // Update tenant connection configuration for MySQL
+            $this->config->set([
+                'database.connections.tenant.driver' => 'mysql',
+                'database.connections.tenant.database' => $tenant->db_name,
+                'database.connections.tenant.username' => $tenant->db_user,
+                'database.connections.tenant.password' => $tenant->db_pass,
+            ]);
 
-        // Purge and reconnect to ensure new configuration is used
-        DB::purge('tenant');
-        DB::reconnect('tenant');
+            // Purge and reconnect to ensure new configuration is used
+            DB::purge('tenant');
+            DB::reconnect('tenant');
 
-        return $tenant;
+            // Test the connection
+            DB::connection('tenant')->getPdo();
+
+            return $tenant;
+        } catch (\Exception $e) {
+            throw new DatabaseConnectionException(
+                "Failed to connect to tenant database: " . $e->getMessage()
+            );
+        }
     }
 
     /**
@@ -56,10 +72,24 @@ class TenantManager
     public function isTenantActive(int $tenantId): bool
     {
         try {
-            $tenant = Tenant::findOrFail($tenantId);
-            return $tenant->status === 'active';
+            $tenant = Tenant::find($tenantId);
+            return $tenant && $tenant->status === 'active';
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Get tenant by ID with proper error handling
+     */
+    public function getTenant(int $tenantId): Tenant
+    {
+        $tenant = Tenant::find($tenantId);
+        
+        if (!$tenant) {
+            throw new TenantNotFoundException("Tenant with ID {$tenantId} not found");
+        }
+        
+        return $tenant;
     }
 }

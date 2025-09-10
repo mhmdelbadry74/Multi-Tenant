@@ -6,6 +6,7 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\SignatureInvalidException;
+use App\Exceptions\Custom\JwtException;
 
 class JwtService
 {
@@ -38,11 +39,11 @@ class JwtService
             $decoded = JWT::decode($token, new Key($this->key, 'HS256'));
             return (array) $decoded;
         } catch (ExpiredException $e) {
-            throw new \Exception('Token has expired');
+            throw new JwtException('Token has expired', 401, 'JWT_EXPIRED');
         } catch (SignatureInvalidException $e) {
-            throw new \Exception('Invalid token signature');
+            throw new JwtException('Invalid token signature', 401, 'JWT_INVALID_SIGNATURE');
         } catch (\Exception $e) {
-            throw new \Exception('Invalid token');
+            throw new JwtException('Invalid token', 401, 'JWT_INVALID');
         }
     }
 
@@ -55,13 +56,13 @@ class JwtService
         
         foreach ($required as $claim) {
             if (!isset($claims[$claim]) || empty($claims[$claim])) {
-                return false;
+                throw new JwtException("Missing required claim: {$claim}", 401, 'JWT_MISSING_CLAIM');
             }
         }
 
         // Check expiration
         if (isset($claims['exp']) && $claims['exp'] < time()) {
-            return false;
+            throw new JwtException('Token has expired', 401, 'JWT_EXPIRED');
         }
 
         return true;
